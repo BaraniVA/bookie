@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import asyncio  # Move this to the top with other imports
 
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import (
@@ -150,10 +151,13 @@ async def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(conv)
 
-    app.post_init(reminder_loop)
+    # Start the reminder loop as a background task
+    async def start_reminder_loop(application):
+        asyncio.create_task(reminder_loop(application))
+    
+    app.post_init(start_reminder_loop)
     print("🤖 Bot is running...")
     await app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
