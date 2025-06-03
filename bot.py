@@ -152,10 +152,8 @@ async def main():
     app.add_handler(conv)
 
     # Start the reminder loop as a background task
-    async def start_reminder_loop(application):
-        asyncio.create_task(reminder_loop(application))
+    asyncio.create_task(reminder_loop(app))
     
-    app.post_init(start_reminder_loop)
     print("🤖 Bot is running...")
     await app.run_polling()
 
