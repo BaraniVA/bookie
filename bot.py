@@ -20,8 +20,8 @@ GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 
-# DB setup
 DB_NAME = "appointments.db"
+
 def init_db():
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute('''
@@ -33,23 +33,18 @@ def init_db():
             )
         ''')
 
-# Conversation states
 ASK_EMAIL, ASK_DATE = range(2)
 
-# Start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Welcome! Use /book to schedule an appointment.")
 
-# Help command
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📅 Use /book to book an appointment.\n❌ Use /cancel to stop.")
 
-# Cancel booking
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Booking cancelled.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
-# /book flow
 async def book(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📧 Please enter your email:")
     return ASK_EMAIL
@@ -77,11 +72,9 @@ async def save_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (user_id, username, email, dt.isoformat())
         )
 
-    # Confirmation message
     msg = f"✅ Hi {username}, your appointment is confirmed for {dt.strftime('%Y-%m-%d %H:%M')}."
     await update.message.reply_text(msg)
 
-    # Send emails to user and admin
     body = (
         f"Hi {username},\n\nYour appointment is confirmed:\n"
         f"🕒 {dt.strftime('%Y-%m-%d %H:%M')}\n📧 {email}\n\nThanks!"
@@ -91,7 +84,6 @@ async def save_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
-# Email sender
 def send_email(to, subject, body):
     try:
         msg = MIMEMultipart()
@@ -107,7 +99,6 @@ def send_email(to, subject, body):
     except Exception as e:
         print(f"❌ Failed to send email to {to}: {e}")
 
-# Auto reminders
 async def reminder_loop(app):
     while True:
         now = datetime.now()
@@ -120,9 +111,7 @@ async def reminder_loop(app):
             appt_dt = datetime.fromisoformat(dt)
             if now < appt_dt <= check_time:
                 try:
-                    # Telegram reminder
                     await app.bot.send_message(user_id, text=f"🔔 Reminder: Appointment at {appt_dt.strftime('%Y-%m-%d %H:%M')}")
-                    # Email reminder
                     body = (
                         f"Hi {username},\n\nThis is a reminder for your appointment:\n"
                         f"🕒 {appt_dt.strftime('%Y-%m-%d %H:%M')}\n\nThanks!"
@@ -133,8 +122,7 @@ async def reminder_loop(app):
 
         await asyncio.sleep(60)
 
-# Run bot
-async def main():
+def main():
     init_db()
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
@@ -151,11 +139,14 @@ async def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(conv)
 
-    # Start the reminder loop as a background task
-    asyncio.create_task(reminder_loop(app))
+    # Start reminder loop in background AFTER app starts polling
+    async def on_startup(app):
+        asyncio.create_task(reminder_loop(app))
+
+    app.post_init = on_startup
 
     print("🤖 Bot is running...")
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
